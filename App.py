@@ -8,12 +8,7 @@ from sklearn.model_selection import train_test_split
 from model import RNNModel
 import utils
 from nltk.corpus import stopwords # type: ignore
-
-# Load and process the CSV file
-df = pd.read_csv('Symptoms.csv')
-df.drop('Unnamed: 0', axis=1, inplace=True)
-df.drop_duplicates(inplace=True)
-train_data, test_data = train_test_split(df, test_size=0.15, random_state=42)
+import joblib
 
 # Class names and disease advice
 class_names = {
@@ -69,10 +64,8 @@ disease_advice = {
     'Peptic ulcer disease': "Avoid spicy and acidic foods, take prescribed medications, and manage stress. Consult a gastroenterologist for guidance.",
     'Urinary tract infection': "Stay hydrated, take prescribed antibiotics, and maintain good hygiene. Consult a doctor for appropriate treatment."
 }
-
-# Initialize vectorizer and model
-vectorizer = utils.create_vectorizer()
-vectorizer.fit(train_data['text'])
+# Load vectorizer
+vectorizer = joblib.load("vectorizer.pkl")
 
 model = RNNModel()
 model.load_state_dict(torch.load('saved_model.pth', map_location=torch.device('cpu')))
@@ -105,6 +98,27 @@ def clean_symptom_input(text):
 def recognize_greetings(message):
     greetings = ["hello", "hi","salam","hiya", "hey", "good morning","good afternoon", "good noon", "hi!", "hola!",  "good evening"]
     goodbyes = ["bye", "thank you","bubye","goodnight","cheers","see you later","see ya", "goodbye", "take care", "see you"]
+    small_talks = [
+        "how are you", "how r you", "how are ya", "how you doing", "how u doing", "how do you do", "howdy", "hey how are you", "hi how r u",
+        "what's up", "sup", "wassup", "wazzup", "yo", "hey there", "hiya", "how goes it", "how's it going", "how's things", "how's life",
+        "how's everything", "how are things", "how are you getting on", "how are you keeping", "you alright", "you good", "u good", "all good",
+        "how have you been", "how've you been", "how u been", "long time no see", "where have you been", "what's good", "what's cracking",
+        "what's happening", "what's new", "what's the good word", "what's the scoop", "what's the story", "what's the deal",
+        "what's new with you", "what's new w u", "what's up lately", "what have you been up to", "what've you been up to", 
+        "what u been up to", "what's going on", "what's going on with you", "what's happening with you", "been busy", "keeping busy", 
+        "what are you up to", "what r u up to", "what are you doing", "whatcha doing", "what's keeping you busy", "anything new", "any updates", 
+        "give me the news", "catch me up", "fill me in", "what's been going on", "what's the latest", "what's new in your world", 
+        "how's your world", "what's shaking", "what's the latest gossip", "got any plans tonight", "got plans tonight", "what are you doing later", 
+        "what u doing later", "what's on for tonight", "anything on tonight", "busy later", "free later", "got time to chat", "what are your plans for the future", 
+        "where do you see yourself in 5 years", "any trips coming up", "going anywhere nice", "planning any travel", "holidays soon", 
+        "got any days off coming", "taking time off soon", "how are you feeling", "how r u feeling", "you okay", "u ok", "you alright", "feeling better", 
+        "you getting over that cold", "taken your meds", "feeling any better", "how's your health", "been sleeping okay", "eating well", "staying healthy", 
+        "how's your back", "how's your head", "headache gone", "feeling fit", "you seem tired, you ok", "you look tired, everything alright",
+        "how are you feeling today", "you in a good mood", "feeling positive", "having a good day", "struggling today", "hanging in there", 
+        "you look happy", "you seem down, you ok", "you seem off, everything fine", "you doing alright", "you holding up okay", "keeping your head up", 
+        "staying strong", "you sound tired", "you sound stressed, need to vent"
+        ]
+    
     message_cleaned = clean_symptom_input(message)
     
 
@@ -112,6 +126,8 @@ def recognize_greetings(message):
         return "greeting"
     elif message_cleaned in goodbyes:
         return "goodbye"
+    elif message_cleaned in small_talks:
+        return "smalltalk"
 
     return None
 
@@ -142,6 +158,14 @@ def respond(message, chat_history, symptoms_state, questions_state, feedback_sta
             "Take care! If you have more questions, feel free to ask.",
             "Goodbye! Stay healthy, and reach out if you need more help."
         ])
+    elif response_type == "smalltalk":
+        bot_message = random.choice([
+            "I'm medical symptoms categorization chatbot and I'm ready to help. Please tell me your symptoms.",
+            "I am not sure what are you talking about. Could you describe your symptoms so I can assist you?",
+            "I can only take symptoms as input. Could you describe your symptoms so I can assist you?",
+            "I can assist with symptoms. Please describe your symptoms so I can assist you."
+
+        ])
         chat_history.append((message, bot_message))
         return "", chat_history, [], [], False, 0
 
@@ -168,13 +192,12 @@ def respond(message, chat_history, symptoms_state, questions_state, feedback_sta
                 probabilities = torch.softmax(y_logits, dim=1)
                 confidence, predicted_class = torch.max(probabilities, dim=1)
 
-            if confidence.item() < 0.50:
+            if confidence.item() < 0.75:
                 bot_message = (
                     f"The model is not confident enough yet "
-                    f"({confidence.item()*100:.1f}% confidence). "
+                    f"({confidence.item()*100:.1f}% Model score). "
                     "Please provide more symptoms, for example fever, pain location, duration, cough, nausea, vomiting, rash, or sleep issues."
                 )
-                # IMPORTANT: do NOT reset user_symptoms here
             else:
                 predicted_disease = class_names[predicted_class.item()]
                 bot_message = (
@@ -193,12 +216,12 @@ def respond(message, chat_history, symptoms_state, questions_state, feedback_sta
 
         except Exception as e:
             bot_message = f"I encountered an error: {str(e)}"
-        user_symptoms = []  # Reset symptoms after prediction
+    
     else:
-        if len(user_symptoms) == 2:
-            bot_message = "Could you provide one more symptom for a more accurate prediction?"
-        else:
-            bot_message = "Please describe your symptoms in more detail (at least 3 symptoms)."
+        bot_message = (
+            "Please describe your symptoms in more detail. "
+            "For example, mention symptoms, duration, pain location, fever, rash, vomiting, cough, or sleep issues."
+        )
     
     chat_history.append((message, bot_message))
     return "", chat_history, user_symptoms, questions_asked, feedback_state, attempts
