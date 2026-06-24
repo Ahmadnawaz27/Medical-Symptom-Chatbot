@@ -1,42 +1,10 @@
 import pandas as pd
 import random
 import gradio as gr
-import torch
-import time
 import re
-from sklearn.model_selection import train_test_split
-from model import RNNModel
-import utils
 from nltk.corpus import stopwords # type: ignore
 import joblib
-
-# Class names and disease advice
-class_names = {
-    0: 'Acne',
-    1: 'Arthritis',
-    2: 'Bronchial Asthma',
-    3: 'Cervical spondylosis',
-    4: 'Chicken pox',
-    5: 'Common Cold',
-    6: 'Dengue',
-    7: 'Dimorphic Hemorrhoids',
-    8: 'Fungal infection',
-    9: 'Hypertension',
-    10: 'Impetigo',
-    11: 'Jaundice',
-    12: 'Malaria',
-    13: 'Migraine',
-    14: 'Pneumonia',
-    15: 'Psoriasis',
-    16: 'Typhoid',
-    17: 'Varicose Veins',
-    18: 'Allergy',
-    19: 'Diabetes',
-    20: 'Drug reaction',
-    21: 'Gastroesophageal reflux disease',
-    22: 'Peptic ulcer disease',
-    23: 'Urinary tract infection'
-}
+from symptom_extractor import extract_symptoms_from_history, format_symptoms
 
 disease_advice = {
     'Acne': "Maintain a proper skincare routine, avoid excessive touching of the affected areas, and consider using over-the-counter topical treatments. If severe, consult a dermatologist.",
@@ -64,11 +32,9 @@ disease_advice = {
     'Peptic ulcer disease': "Avoid spicy and acidic foods, take prescribed medications, and manage stress. Consult a gastroenterologist for guidance.",
     'Urinary tract infection': "Stay hydrated, take prescribed antibiotics, and maintain good hygiene. Consult a doctor for appropriate treatment."
 }
-# Load vectorizer
-vectorizer = joblib.load("vectorizer.pkl")
 
-model = RNNModel()
-model.load_state_dict(torch.load('saved_model.pth', map_location=torch.device('cpu')))
+symptom_model = joblib.load("symptom_model.pkl")
+symptom_columns = joblib.load("symptom_columns.pkl")
 
 # Instructions and UI setup
 instructions = """<h2>Welcome to MediChat! Your Medical Chatbot</h2>
@@ -115,7 +81,7 @@ def recognize_greetings(message):
         "you getting over that cold", "taken your meds", "feeling any better", "how's your health", "been sleeping okay", "eating well", "staying healthy", 
         "how's your back", "how's your head", "headache gone", "feeling fit", "you seem tired, you ok", "you look tired, everything alright",
         "how are you feeling today", "you in a good mood", "feeling positive", "having a good day", "struggling today", "hanging in there", 
-        "you look happy", "you seem down, you ok", "you seem off, everything fine", "you doing alright", "you holding up okay", "keeping your head up", 
+        "you look happy","hi how are you", "hello how are you", "hey how are you", "hi how you doing", "hello how you doing", "you seem down, you ok", "you seem off, everything fine", "you doing alright", "you holding up okay", "keeping your head up", 
         "staying strong", "you sound tired", "you sound stressed, need to vent"
         ]
     
@@ -141,7 +107,11 @@ def respond(message, chat_history, symptoms_state, questions_state, feedback_sta
 
     # Clean and preprocess message
     cleaned_message = clean_symptom_input(message)
-    
+    if cleaned_message in ["reset", "start over", "new case", "clear symptoms"]:
+        bot_message = "Okay, I have cleared the previous symptoms. Please describe the new symptoms."
+        chat_history.append((message, bot_message))
+        return "", chat_history, [], [], False, 0
+
     # Check for greetings and goodbyes
     response_type = recognize_greetings(message)
     
@@ -158,6 +128,8 @@ def respond(message, chat_history, symptoms_state, questions_state, feedback_sta
             "Take care! If you have more questions, feel free to ask.",
             "Goodbye! Stay healthy, and reach out if you need more help."
         ])
+        chat_history.append((message, bot_message))
+        return "", chat_history, [], [], False, 0
     elif response_type == "smalltalk":
         bot_message = random.choice([
             "I'm medical symptoms categorization chatbot and I'm ready to help. Please tell me your symptoms.",
@@ -178,42 +150,109 @@ def respond(message, chat_history, symptoms_state, questions_state, feedback_sta
     # Process symptoms
     user_symptoms.append(cleaned_message)
     combined_symptoms = " ".join(user_symptoms)
+    detected_symptoms = extract_symptoms_from_history(user_symptoms)
 
-    if len(combined_symptoms.split()) >= 8:
-
-        transform_text = vectorizer.transform([combined_symptoms])
-        transform_text = torch.tensor(transform_text.toarray()).to(torch.float32)
+    if len(detected_symptoms) >= 2:
 
         # Make prediction
         try:
-            model.eval()    
-            with torch.inference_mode():
-                y_logits = model(transform_text)
-                probabilities = torch.softmax(y_logits, dim=1)
-                confidence, predicted_class = torch.max(probabilities, dim=1)
 
-            if confidence.item() < 0.75:
+            if len(detected_symptoms) < 2:
                 bot_message = (
-                    f"The model is not confident enough yet "
-                    f"({confidence.item()*100:.1f}% Model score). "
-                    "Please provide more symptoms, for example fever, pain location, duration, cough, nausea, vomiting, rash, or sleep issues."
+                    "I detected too few clear symptoms. "
+                    "Please describe more specific symptoms such as fever, rash, vomiting, cough, pain, dizziness, itching, or duration."
                 )
             else:
-                predicted_disease = class_names[predicted_class.item()]
-                bot_message = (
-                    f"The model suggests a possible condition: {predicted_disease} "
-                    f"with {confidence.item()*100:.1f}% confidence. "
-                    f"General advice: {disease_advice[predicted_disease]}. "
-                    "Please consult a healthcare professional for proper diagnosis."
-                )
-                user_symptoms = []
-             # with torch.inference_mode():
-            #     y_logits = model(transform_text)
-            #     pred_prob = torch.argmax(torch.softmax(y_logits, dim=1), dim=1)
-            # predicted_disease = class_names[pred_prob.item()]
-            
-            # bot_message = f"The model suggests a possible condition: {predicted_disease}. General advice: {disease_advice[predicted_disease]}. Please consult a healthcare professional for proper diagnosis."
+                user_row = {
+                    symptom: 1 if symptom in detected_symptoms else 0
+                    for symptom in symptom_columns
+                }
 
+                X_user = pd.DataFrame([user_row])
+
+                probabilities = symptom_model.predict_proba(X_user)[0]
+                class_labels = symptom_model.classes_
+
+                top_indices = probabilities.argsort()[-3:][::-1]
+
+                top_matches = [
+                    (class_labels[i], probabilities[i])
+                    for i in top_indices
+                ]
+
+                top_disease, top_score = top_matches[0]
+                second_disease, second_score = top_matches[1]
+                score_gap = top_score - second_score
+
+                detected_text = format_symptoms(detected_symptoms)
+
+                general_symptoms = {
+                    "fever",
+                    "fatigue",
+                    "loss_of_appetite",
+                    "nausea",
+                    "headache",
+                    "dizziness",
+                    "poor_sleep",
+                    "sweating"
+                }
+
+                specific_symptoms = [
+                    symptom for symptom in detected_symptoms
+                    if symptom not in general_symptoms
+                ]
+
+                general_only = len(specific_symptoms) == 0
+
+                if len(detected_symptoms) < 3:
+                    bot_message = (
+                        f"I detected these symptoms: {detected_text}. "
+                        "These symptoms are too general to suggest one condition safely. "
+                        "Please add more details such as duration, headache, stomach pain, diarrhoea, vomiting, chills, rash, cough, body pain, or pain location. "
+                        "This is not a diagnosis."
+                    )
+
+                elif general_only and len(detected_symptoms) < 4:
+                    bot_message = (
+                        f"I detected these symptoms: {detected_text}. "
+                        "These symptoms can appear in many conditions, so I need more detail before suggesting a likely match. "
+                        "Please add any more specific symptoms such as stomach pain, diarrhoea, vomiting, chills, rash, cough, sore throat, burning urination, or pain location. "
+                        "This is not a diagnosis."
+                    )
+
+                elif general_only and (top_score < 0.75 or score_gap < 0.25):
+                    bot_message = (
+                        f"I detected these symptoms: {detected_text}. "
+                        "These symptoms are still quite general, and the model is not strong enough to suggest one condition safely. "
+                        "Top model matches are: "
+                        f"{top_matches[0][0]} ({top_matches[0][1]*100:.1f}% model score), "
+                        f"{top_matches[1][0]} ({top_matches[1][1]*100:.1f}% model score), "
+                        f"and {top_matches[2][0]} ({top_matches[2][1]*100:.1f}% model score). "
+                        "Please add more specific details before relying on a match. "
+                        "This is not a diagnosis."
+                    )
+
+                elif top_score < 0.50 or score_gap < 0.10:
+                    bot_message = (
+                        f"I detected these symptoms: {detected_text}. "
+                        "The symptom combination does not strongly match one condition. "
+                        "Top model matches are: "
+                        f"{top_matches[0][0]} ({top_matches[0][1]*100:.1f}% model score), "
+                        f"{top_matches[1][0]} ({top_matches[1][1]*100:.1f}% model score), "
+                        f"and {top_matches[2][0]} ({top_matches[2][1]*100:.1f}% model score). "
+                        "Please add more details such as duration, fever pattern, rash, vomiting, cough, pain location, or breathing issues. "
+                        "This is not a diagnosis."
+                    )
+
+                else:
+                    bot_message = (
+                        f"I detected these symptoms: {detected_text}. "
+                        f"The strongest model match is: {top_disease} "
+                        f"with {top_score*100:.1f}% model score. "
+                        f"General advice: {disease_advice.get(top_disease, 'Please consult a healthcare professional.')} "
+                        "This is not a diagnosis. Please consult a healthcare professional for proper medical advice."
+                    )
+                    # user_symptoms = []
         except Exception as e:
             bot_message = f"I encountered an error: {str(e)}"
     
@@ -233,7 +272,9 @@ with gr.Blocks() as demo:
 
     medi_chat = gr.Chatbot(label="MediChat")
     msg = gr.Textbox(label="Enter your symptoms here")
-    clear = gr.ClearButton([msg, medi_chat], value="Clear Chat")
+    # clear = gr.ClearButton([msg, medi_chat], value="Clear Chat")
+    clear = gr.Button("Clear Chat")
+
 
     # Define states for user symptoms, questions asked, feedback given, and attempts
     symptoms_state = gr.State([])
@@ -243,5 +284,8 @@ with gr.Blocks() as demo:
 
     msg.submit(respond, [msg, medi_chat, symptoms_state, questions_state, feedback_state, attempt_state], 
                [msg, medi_chat, symptoms_state, questions_state, feedback_state, attempt_state])
-
-demo.launch(share=True)
+    clear.click(
+        lambda: ("", [], [], [], False, 0),
+        outputs=[msg, medi_chat, symptoms_state, questions_state, feedback_state, attempt_state]
+    )
+demo.launch(share=True, debug=True)
