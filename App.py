@@ -42,7 +42,8 @@ instructions = """<h2>Welcome to MediChat! Your Medical Chatbot</h2>
   <li><b>How to Start:</b> Type your symptoms in the textbox and press enter.</li>
   <li>The bot will respond with the best possible answers to your messages. For now, let's keep it simple as we continue to enhance its capabilities.</li>
   <p><b>Disclaimer:</b> This chatbot is for educational purposes only and does not provide medical diagnosis. Please consult a qualified healthcare professional for medical concerns.</p>
-</ol>   
+</ol> 
+  
 """
 
 # Function to detect gibberish or invalid input based on stopwords and input length
@@ -288,4 +289,4 @@ with gr.Blocks() as demo:
         lambda: ("", [], [], [], False, 0),
         outputs=[msg, medi_chat, symptoms_state, questions_state, feedback_state, attempt_state]
     )
-demo.launch(share=True, debug=True)
+demo.launch(debug=True)
