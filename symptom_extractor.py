@@ -10,7 +10,7 @@ SYMPTOM_KEYWORDS = {
     "rash": ["rash", "red spots", "spots", "skin spots", "red bumps", "bumps", "skin bumps", "red lesions", "lesions", "skin lesions",
              "red patches", "patches", "skin patches", "red marks", "marks", "skin marks",
              "red welts", "welts", "skin welts", "red hives", "hives", "skin hives","skin redness", "red skin", "red patches", "patchy skin", "skin inflammation", "inflamed skin", "skin irritation"],
-    "itching": ["itching", "itchy", "scratch", "scratching", "skin itch", "skin is itchy", "itchy skin", "itchy rash", "rash is itchy", "itchy spots", "spots are itchy"
+    "itching": ["itching", "itchy", "scratch", "scratching", "skin itch", "skin is itchy", "itchy skin", "itchy rash", "rash is itchy", "itchy spots", "spots are itchy",
                 "itchy bumps", "bumps are itchy", "itchy lesions", "lesions are itchy", "itchy patches", "patches are itchy"],
     "blocked_nose": ["blocked nose", "stuffy nose", "nose blocked", "nasal congestion"],
     "runny_nose": ["runny nose" , "running nose", "nose running", "nasal discharge", "nasal drip", "nose discharge", "nose drip", "nose is running"],
@@ -127,7 +127,8 @@ SYMPTOM_KEYWORDS = {
     "medicine_reaction": [
             "reaction to medicine", "medicine reaction", "adverse reaction to medicine",
             "adverse medicine reaction", "side effect of medicine", "medicine side effect",
-            "allergic reaction to medicine", "allergic medicine reaction", "medicine allergy"
+            "allergic reaction to medicine", "allergic medicine reaction", "medicine allergy",
+            "rash after medicine","rash after medication","swelling after medicine","itching after medicine"
         ],
     "low_blood_pressure": [
             "low blood pressure", "blood pressure low", "hypotension",
@@ -151,6 +152,23 @@ SYMPTOM_KEYWORDS = {
     "vein_swelling": [
         "vein swelling", "veins swelling", "swollen veins",
         "swollen vein", "veins are swollen"
+    ],
+    "yellow_skin": [
+    "yellow skin", "yellowish skin", "skin yellow",
+    "skin turned yellow", "skin has turned yellow",
+    "skin is yellow"
+    ],
+
+    "yellow_eyes": [
+        "yellow eyes", "eyes yellow",
+        "eyes turned yellow", "eyes have turned yellow",
+        "eyes are yellow"
+    ],
+
+    "dark_urine": [
+        "dark urine", "urine is dark",
+        "dark coloured urine", "dark colored urine",
+        "urine has become dark"
     ],
 
     "inflamed_skin": [
@@ -177,12 +195,19 @@ def phrase_exists(text, phrase):
 
 
 def is_negated(text, phrase):
-    match = re.search(r"(?<![a-z])" + re.escape(phrase) + r"(?![a-z])", text)
+    pattern = r"(?<![a-z])" + re.escape(phrase) + r"(?![a-z])"
+    match = re.search(pattern, text)
 
     if not match:
         return False
 
-    window = text[max(0, match.start() - 45):match.start()]
+    window = text[max(0, match.start() - 60):match.start()]
+
+    # If there is a contrast word like "but", only check after it
+    clause_breaks = [" but ", " however ", " though ", " although ", " yet "]
+    for breaker in clause_breaks:
+        if breaker in window:
+            window = window.split(breaker)[-1]
 
     negation_patterns = [
         r"\bno\b",

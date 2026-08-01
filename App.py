@@ -111,7 +111,7 @@ def respond(message, chat_history, symptoms_state, questions_state, feedback_sta
     if cleaned_message in ["reset", "start over", "new case", "clear symptoms"]:
         bot_message = "Okay, I have cleared the previous symptoms. Please describe the new symptoms."
         chat_history.append((message, bot_message))
-        return "", chat_history, [], [], False, 0
+        return "", chat_history, user_symptoms, questions_asked, feedback_state, attempts
 
     # Check for greetings and goodbyes
     response_type = recognize_greetings(message)
@@ -143,7 +143,9 @@ def respond(message, chat_history, symptoms_state, questions_state, feedback_sta
         return "", chat_history, [], [], False, 0
 
     # Handle gibberish input
-    if is_gibberish(cleaned_message):
+    quick_symptoms = extract_symptoms_from_history([cleaned_message])
+
+    if not quick_symptoms and is_gibberish(cleaned_message):
         bot_message = "I couldn't quite understand that. Could you describe your symptoms in more detail?"
         chat_history.append((message, bot_message))
         return "", chat_history, user_symptoms, questions_asked, feedback_state, attempts
