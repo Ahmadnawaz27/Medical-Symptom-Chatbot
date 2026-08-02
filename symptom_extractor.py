@@ -1,4 +1,6 @@
 import re
+import nltk
+nltk.download('stopwords', quiet=True)
 
 SYMPTOM_KEYWORDS = {
     "fever": ["fever", "high temperature", "temperature", "hot body"],
@@ -132,7 +134,7 @@ SYMPTOM_KEYWORDS = {
         ],
     "low_blood_pressure": [
             "low blood pressure", "blood pressure low", "hypotension",
-            "low bp", "bp low", "elevated blood pressure", "blood pressure elevated",
+            "low bp", "bp low", "blood pressure", "blood pressure is low",
             "low blood pressure readings", "blood pressure readings low",
             "low blood pressure levels", "blood pressure levels low",
 

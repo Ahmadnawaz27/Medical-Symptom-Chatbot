@@ -6,6 +6,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, accuracy_score
 
 from symptom_extractor import extract_symptoms, SYMPTOM_KEYWORDS
+from sklearn.model_selection import cross_val_score, StratifiedKFold
 
 
 # Load dataset
@@ -27,6 +28,7 @@ for text in df["text"]:
 X = pd.DataFrame(rows)
 y = df["label"]
 
+
 # Split data
 X_train, X_test, y_train, y_test = train_test_split(
     X,
@@ -38,12 +40,18 @@ X_train, X_test, y_train, y_test = train_test_split(
 
 # Train model
 model = RandomForestClassifier(
-    n_estimators=300,
-    random_state=42,
-    class_weight="balanced"
+    n_estimators=100,
+    max_depth=20,
+    class_weight="balanced",
+    random_state=42
 )
-
 model.fit(X_train, y_train)
+
+
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+scores = cross_val_score(model, X, y, cv=cv)
+print(f"5-fold CV accuracy: {scores.mean():.3f} (+/- {scores.std():.3f})")
+
 
 # Evaluate
 y_pred = model.predict(X_test)

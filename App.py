@@ -111,7 +111,7 @@ def respond(message, chat_history, symptoms_state, questions_state, feedback_sta
     if cleaned_message in ["reset", "start over", "new case", "clear symptoms"]:
         bot_message = "Okay, I have cleared the previous symptoms. Please describe the new symptoms."
         chat_history.append((message, bot_message))
-        return "", chat_history, user_symptoms, questions_asked, feedback_state, attempts
+        return "", chat_history, [], [], False, 0
 
     # Check for greetings and goodbyes
     response_type = recognize_greetings(message)
@@ -257,7 +257,8 @@ def respond(message, chat_history, symptoms_state, questions_state, feedback_sta
                     )
                     # user_symptoms = []
         except Exception as e:
-            bot_message = f"I encountered an error: {str(e)}"
+            print(f"Error: {e}")
+            bot_message = "Something went wrong processing that. Please try rephrasing your symptoms."
     
     else:
         bot_message = (
@@ -291,4 +292,4 @@ with gr.Blocks() as demo:
         lambda: ("", [], [], [], False, 0),
         outputs=[msg, medi_chat, symptoms_state, questions_state, feedback_state, attempt_state]
     )
-demo.launch(debug=True)
+demo.launch()
