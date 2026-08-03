@@ -17,7 +17,7 @@ df = df.dropna(subset=["text", "label"])
 
 symptom_columns = list(SYMPTOM_KEYWORDS.keys())
 
-# Convert text into symptom columns
+# Build binary symptom feature for each text description
 rows = []
 
 for text in df["text"]:

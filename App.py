@@ -46,7 +46,7 @@ instructions = """<h2>Welcome to MediChat! Your Medical Chatbot</h2>
   
 """
 
-# Function to detect gibberish or invalid input based on stopwords and input length
+# Basic function to check if the input is gibberish
 def is_gibberish(text):
     stop_words = set(stopwords.words('english'))
     words = text.split()
@@ -54,14 +54,12 @@ def is_gibberish(text):
         return True
     return False
 
-# Function to clean and preprocess the symptom input
 def clean_symptom_input(text):
-    # Remove punctuation, extra spaces, and convert to lowercase
+    #normalize input for matching
     cleaned_text = re.sub(r'[^a-zA-Z\s]', '', text).strip().lower()
-    cleaned_text = re.sub(r'\s+', ' ', cleaned_text)  # Replace multiple spaces with single space
+    cleaned_text = re.sub(r'\s+', ' ', cleaned_text)  
     return cleaned_text
 
-# Function to recognize greetings and goodbyes
 def recognize_greetings(message):
     greetings = ["hello", "hi","salam","hiya", "hey", "good morning","good afternoon", "good noon", "hi!", "hola!",  "good evening"]
     goodbyes = ["bye", "thank you","bubye","goodnight","cheers","see you later","see ya", "goodbye", "take care", "see you"]
@@ -98,7 +96,6 @@ def recognize_greetings(message):
 
     return None
 
-# Function to respond to user input
 def respond(message, chat_history, symptoms_state, questions_state, feedback_state, attempt_state):
     # Unpack state
     user_symptoms = symptoms_state or []

@@ -6,6 +6,22 @@ This was originally developed as an MSc group project. During testing, I found t
 
 ---
 
+## Screenshots
+
+**Withholding a prediction when symptoms are too general**
+
+![Chatbot asking for more detail after vague symptoms](screenshots/01-asks-for-detail.png)
+
+**Asking a follow-up, then committing once there is enough to go on**
+
+![Chatbot refusing, then matching Fungal infection after more detail](screenshots/02-follow-up-then-match.png)
+
+**A confident match when the symptoms are specific**
+
+![Chatbot matching Varicose Veins at 94.6%](screenshots/03-confident-match.png)
+
+---
+
 ## How it works
 
 The chatbot processes each message in three main steps:
