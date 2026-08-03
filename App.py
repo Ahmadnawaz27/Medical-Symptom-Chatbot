@@ -156,102 +156,95 @@ def respond(message, chat_history, symptoms_state, questions_state, feedback_sta
 
         # Make prediction
         try:
+            user_row = {
+                symptom: 1 if symptom in detected_symptoms else 0
+                for symptom in symptom_columns
+            }
 
-            if len(detected_symptoms) < 2:
+            X_user = pd.DataFrame([user_row])
+
+            probabilities = symptom_model.predict_proba(X_user)[0]
+            class_labels = symptom_model.classes_
+
+            top_indices = probabilities.argsort()[-3:][::-1]
+
+            top_matches = [
+                (class_labels[i], probabilities[i])
+                for i in top_indices
+            ]
+
+            top_disease, top_score = top_matches[0]
+            second_disease, second_score = top_matches[1]
+            score_gap = top_score - second_score
+
+            detected_text = format_symptoms(detected_symptoms)
+
+            general_symptoms = {
+                "fever",
+                "fatigue",
+                "loss_of_appetite",
+                "nausea",
+                "headache",
+                "dizziness",
+                "poor_sleep",
+                "sweating"
+            }
+
+            specific_symptoms = [
+                symptom for symptom in detected_symptoms
+                if symptom not in general_symptoms
+            ]
+
+            general_only = len(specific_symptoms) == 0
+
+            if len(detected_symptoms) < 3:
                 bot_message = (
-                    "I detected too few clear symptoms. "
-                    "Please describe more specific symptoms such as fever, rash, vomiting, cough, pain, dizziness, itching, or duration."
+                    f"I detected these symptoms: {detected_text}. "
+                    "These symptoms are too general to suggest one condition safely. "
+                    "Please add more details such as duration, headache, stomach pain, diarrhoea, vomiting, chills, rash, cough, body pain, or pain location. "
+                    "This is not a diagnosis."
                 )
+
+            elif general_only and len(detected_symptoms) < 4:
+                bot_message = (
+                    f"I detected these symptoms: {detected_text}. "
+                    "These symptoms can appear in many conditions, so I need more detail before suggesting a likely match. "
+                    "Please add any more specific symptoms such as stomach pain, diarrhoea, vomiting, chills, rash, cough, sore throat, burning urination, or pain location. "
+                    "This is not a diagnosis."
+                )
+
+            elif general_only and (top_score < 0.75 or score_gap < 0.25):
+                bot_message = (
+                    f"I detected these symptoms: {detected_text}. "
+                    "These symptoms are still quite general, and the model is not strong enough to suggest one condition safely. "
+                    "Top model matches are: "
+                    f"{top_matches[0][0]} ({top_matches[0][1]*100:.1f}% model score), "
+                    f"{top_matches[1][0]} ({top_matches[1][1]*100:.1f}% model score), "
+                    f"and {top_matches[2][0]} ({top_matches[2][1]*100:.1f}% model score). "
+                    "Please add more specific details before relying on a match. "
+                    "This is not a diagnosis."
+                )
+
+            elif top_score < 0.50 or score_gap < 0.10:
+                bot_message = (
+                    f"I detected these symptoms: {detected_text}. "
+                    "The symptom combination does not strongly match one condition. "
+                    "Top model matches are: "
+                    f"{top_matches[0][0]} ({top_matches[0][1]*100:.1f}% model score), "
+                    f"{top_matches[1][0]} ({top_matches[1][1]*100:.1f}% model score), "
+                    f"and {top_matches[2][0]} ({top_matches[2][1]*100:.1f}% model score). "
+                    "Please add more details such as duration, fever pattern, rash, vomiting, cough, pain location, or breathing issues. "
+                    "This is not a diagnosis."
+                )
+
             else:
-                user_row = {
-                    symptom: 1 if symptom in detected_symptoms else 0
-                    for symptom in symptom_columns
-                }
-
-                X_user = pd.DataFrame([user_row])
-
-                probabilities = symptom_model.predict_proba(X_user)[0]
-                class_labels = symptom_model.classes_
-
-                top_indices = probabilities.argsort()[-3:][::-1]
-
-                top_matches = [
-                    (class_labels[i], probabilities[i])
-                    for i in top_indices
-                ]
-
-                top_disease, top_score = top_matches[0]
-                second_disease, second_score = top_matches[1]
-                score_gap = top_score - second_score
-
-                detected_text = format_symptoms(detected_symptoms)
-
-                general_symptoms = {
-                    "fever",
-                    "fatigue",
-                    "loss_of_appetite",
-                    "nausea",
-                    "headache",
-                    "dizziness",
-                    "poor_sleep",
-                    "sweating"
-                }
-
-                specific_symptoms = [
-                    symptom for symptom in detected_symptoms
-                    if symptom not in general_symptoms
-                ]
-
-                general_only = len(specific_symptoms) == 0
-
-                if len(detected_symptoms) < 3:
-                    bot_message = (
-                        f"I detected these symptoms: {detected_text}. "
-                        "These symptoms are too general to suggest one condition safely. "
-                        "Please add more details such as duration, headache, stomach pain, diarrhoea, vomiting, chills, rash, cough, body pain, or pain location. "
-                        "This is not a diagnosis."
-                    )
-
-                elif general_only and len(detected_symptoms) < 4:
-                    bot_message = (
-                        f"I detected these symptoms: {detected_text}. "
-                        "These symptoms can appear in many conditions, so I need more detail before suggesting a likely match. "
-                        "Please add any more specific symptoms such as stomach pain, diarrhoea, vomiting, chills, rash, cough, sore throat, burning urination, or pain location. "
-                        "This is not a diagnosis."
-                    )
-
-                elif general_only and (top_score < 0.75 or score_gap < 0.25):
-                    bot_message = (
-                        f"I detected these symptoms: {detected_text}. "
-                        "These symptoms are still quite general, and the model is not strong enough to suggest one condition safely. "
-                        "Top model matches are: "
-                        f"{top_matches[0][0]} ({top_matches[0][1]*100:.1f}% model score), "
-                        f"{top_matches[1][0]} ({top_matches[1][1]*100:.1f}% model score), "
-                        f"and {top_matches[2][0]} ({top_matches[2][1]*100:.1f}% model score). "
-                        "Please add more specific details before relying on a match. "
-                        "This is not a diagnosis."
-                    )
-
-                elif top_score < 0.50 or score_gap < 0.10:
-                    bot_message = (
-                        f"I detected these symptoms: {detected_text}. "
-                        "The symptom combination does not strongly match one condition. "
-                        "Top model matches are: "
-                        f"{top_matches[0][0]} ({top_matches[0][1]*100:.1f}% model score), "
-                        f"{top_matches[1][0]} ({top_matches[1][1]*100:.1f}% model score), "
-                        f"and {top_matches[2][0]} ({top_matches[2][1]*100:.1f}% model score). "
-                        "Please add more details such as duration, fever pattern, rash, vomiting, cough, pain location, or breathing issues. "
-                        "This is not a diagnosis."
-                    )
-
-                else:
-                    bot_message = (
-                        f"I detected these symptoms: {detected_text}. "
-                        f"The strongest model match is: {top_disease} "
-                        f"with {top_score*100:.1f}% model score. "
-                        f"General advice: {disease_advice.get(top_disease, 'Please consult a healthcare professional.')} "
-                        "This is not a diagnosis. Please consult a healthcare professional for proper medical advice."
-                    )
+                bot_message = (
+                    f"I detected these symptoms: {detected_text}. "
+                    f"The strongest model match is: {top_disease} "
+                    f"with {top_score*100:.1f}% model score. "
+                    f"General advice: {disease_advice.get(top_disease, 'Please consult a healthcare professional.')} "
+                    "This is not a diagnosis. Please consult a healthcare professional for proper medical advice."
+                )
                     # user_symptoms = []
         except Exception as e:
             print(f"Error: {e}")
