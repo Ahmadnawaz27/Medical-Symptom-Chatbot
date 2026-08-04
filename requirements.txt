@@ -6,3 +6,4 @@ gradio==3.41.2
 fastapi==0.95.2
 starlette==0.27.0
 pydantic==1.10.13
+pyyaml==6.0.1

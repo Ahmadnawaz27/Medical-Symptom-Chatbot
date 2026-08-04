@@ -4,34 +4,14 @@ import gradio as gr
 import re
 from nltk.corpus import stopwords # type: ignore
 import joblib
-from symptom_extractor import extract_symptoms_from_history, format_symptoms
+from pathlib import Path
+import yaml
+from symptom_extractor import extract_symptoms_from_history, format_symptoms, GENERAL_SYMPTOMS
 
-disease_advice = {
-    'Acne': "Maintain a proper skincare routine, avoid excessive touching of the affected areas, and consider using over-the-counter topical treatments. If severe, consult a dermatologist.",
-    'Arthritis': "Stay active with gentle exercises, manage weight, and consider pain-relief strategies like hot/cold therapy. Consult a rheumatologist for tailored guidance.",
-    'Bronchial Asthma': "Follow prescribed inhaler and medication regimen, avoid triggers like smoke and allergens, and have an asthma action plan. Regular check-ups with a pulmonologist are important.",
-    'Cervical spondylosis': "Maintain good posture, do neck exercises, and use ergonomic support. Physical therapy and pain management techniques might be helpful.",
-    'Chicken pox': "Rest, maintain hygiene, and avoid scratching. Consult a doctor for appropriate antiviral treatment.",
-    'Common Cold': "Get plenty of rest, stay hydrated, and consider over-the-counter remedies for symptom relief. Seek medical attention if symptoms worsen or last long.",
-    'Dengue': "Stay hydrated, rest, and manage fever with acetaminophen. Seek medical care promptly, as dengue can escalate quickly.",
-    'Dimorphic Hemorrhoids': "Follow a high-fiber diet, maintain good hygiene, and consider stool softeners. Consult a doctor if symptoms persist.",
-    'Fungal infection': "Keep the affected area clean and dry, use antifungal creams, and avoid sharing personal items. Consult a dermatologist if it persists.",
-    'Hypertension': "Follow a balanced diet, exercise regularly, reduce salt intake, and take prescribed medications. Regular check-ups with a healthcare provider are important.",
-    'Impetigo': "Keep the affected area clean, use prescribed antibiotics, and avoid close contact. Consult a doctor for proper treatment.",
-    'Jaundice': "Get plenty of rest, maintain hydration, and follow a doctor's advice for diet and medications. Regular monitoring is important.",
-    'Malaria': "Take prescribed antimalarial medications, rest, and manage fever. Seek medical attention for severe cases.",
-    'Migraine': "Identify triggers, manage stress, and consider pain-relief medications. Consult a neurologist for personalized management.",
-    'Pneumonia': "Follow prescribed antibiotics, rest, stay hydrated, and monitor symptoms. Seek immediate medical attention for severe cases.",
-    'Psoriasis': "Moisturize, use prescribed creams, and avoid triggers. Consult a dermatologist for effective management.",
-    'Typhoid': "Take prescribed antibiotics, rest, and stay hydrated. Dietary precautions are important. Consult a doctor for proper treatment.",
-    'Varicose Veins': "Elevate legs, exercise regularly, and wear compression stockings. Consult a vascular specialist for evaluation and treatment options.",
-    'Allergy': "Identify triggers, manage exposure, and consider antihistamines. Consult an allergist for comprehensive management.",
-    'Diabetes': "Follow a balanced diet, exercise, monitor blood sugar levels, and take prescribed medications. Regular visits to an endocrinologist are essential.",
-    'Drug reaction': "Discontinue the suspected medication, seek medical attention if symptoms are severe, and inform healthcare providers about the reaction.",
-    'Gastroesophageal reflux disease': "Follow dietary changes, avoid large meals, and consider medications. Consult a doctor for personalized management.",
-    'Peptic ulcer disease': "Avoid spicy and acidic foods, take prescribed medications, and manage stress. Consult a gastroenterologist for guidance.",
-    'Urinary tract infection': "Stay hydrated, take prescribed antibiotics, and maintain good hygiene. Consult a doctor for appropriate treatment."
-}
+_DIR = Path(__file__).parent
+with open(_DIR / "diseases.yaml", encoding="utf-8") as f:
+    disease_advice = yaml.safe_load(f)
+
 
 symptom_model = joblib.load("symptom_model.pkl")
 symptom_columns = joblib.load("symptom_columns.pkl")
@@ -179,20 +159,9 @@ def respond(message, chat_history, symptoms_state, questions_state, feedback_sta
 
             detected_text = format_symptoms(detected_symptoms)
 
-            general_symptoms = {
-                "fever",
-                "fatigue",
-                "loss_of_appetite",
-                "nausea",
-                "headache",
-                "dizziness",
-                "poor_sleep",
-                "sweating"
-            }
-
             specific_symptoms = [
                 symptom for symptom in detected_symptoms
-                if symptom not in general_symptoms
+                if symptom not in GENERAL_SYMPTOMS
             ]
 
             general_only = len(specific_symptoms) == 0
