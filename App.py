@@ -12,7 +12,6 @@ _DIR = Path(__file__).parent
 with open(_DIR / "diseases.yaml", encoding="utf-8") as f:
     disease_advice = yaml.safe_load(f)
 
-
 symptom_model = joblib.load("symptom_model.pkl")
 symptom_columns = joblib.load("symptom_columns.pkl")
 

@@ -360,6 +360,11 @@ scaling_patches:
 - scaly patches
 - patchy skin
 - patches of skin
+- silvery flakes
+- flaky skin
+- silvery scales
+- flakes on elbows
+- dry scaly patches
 itchy_scalp:
 - itchy scalp
 - scalp itch
@@ -457,3 +462,4 @@ _general_symptoms:
   - dizziness
   - poor_sleep
   - sweating
+  

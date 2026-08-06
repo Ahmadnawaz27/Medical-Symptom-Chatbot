@@ -2,6 +2,8 @@ import re
 from pathlib import Path
 import yaml
 import nltk
+from semantic_extractor import extract_semantic
+
 nltk.download('stopwords', quiet=True)
 
 
@@ -59,17 +61,34 @@ def is_negated(text, phrase):
 
 def extract_symptoms(text):
     text = clean_text(text)
-    detected = []
+    detected = set()
+    negated = set()
 
     for symptom, keywords in SYMPTOM_KEYWORDS.items():
+        found = False
+        neg_seen = False
         for keyword in keywords:
             keyword = clean_text(keyword)
-
-            if phrase_exists(text, keyword) and not is_negated(text, keyword):
-                detected.append(symptom)
+            if not phrase_exists(text, keyword):
+                continue
+            if is_negated(text, keyword):
+                neg_seen = True
+            else:
+                found = True
                 break
 
-    return detected
+        if found:
+            detected.add(symptom)
+        elif neg_seen:
+            negated.add(symptom)
+
+    # semantic fallback: only for symptoms the keyword pass didn't decide on
+    sem_found, sem_negated = extract_semantic(text, exclude=detected | negated)
+    detected |= (sem_found - sem_negated)
+    detected -= sem_negated
+
+    # return in YAML order so output stays deterministic
+    return [s for s in SYMPTOM_KEYWORDS if s in detected]
 
 
 def extract_negated_symptoms(text):
@@ -86,7 +105,8 @@ def extract_negated_symptoms(text):
                 negated.append(symptom)
                 break
 
-    return negated
+        _, sem_negated = extract_semantic(text, exclude=set(negated))
+        return [s for s in SYMPTOM_KEYWORDS if s in set(negated) | sem_negated]
 
 
 def extract_symptoms_from_history(messages):
